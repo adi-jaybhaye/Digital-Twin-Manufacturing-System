@@ -621,6 +621,13 @@ function initDashboardCharts() {
   // Utilization Bar Chart
   const ctx1 = document.getElementById('chart-utilization');
   if (ctx1) {
+    if (utilizationChart) {
+      utilizationChart.destroy();
+      utilizationChart = null;
+    } else if (typeof Chart !== 'undefined' && Chart.getChart) {
+      const existing = Chart.getChart(ctx1);
+      if (existing) existing.destroy();
+    }
     utilizationChart = new Chart(ctx1, {
       type: 'bar',
       data: {
@@ -647,6 +654,13 @@ function initDashboardCharts() {
   // Throughput Line Chart
   const ctx2 = document.getElementById('chart-throughput');
   if (ctx2) {
+    if (throughputChart) {
+      throughputChart.destroy();
+      throughputChart = null;
+    } else if (typeof Chart !== 'undefined' && Chart.getChart) {
+      const existing = Chart.getChart(ctx2);
+      if (existing) existing.destroy();
+    }
     throughputChart = new Chart(ctx2, {
       type: 'line',
       data: {
@@ -680,6 +694,13 @@ function initBottleneckCharts() {
   // State distribution Doughnut
   const ctx = document.getElementById('chart-state-dist');
   if (ctx) {
+    if (stateDistChart) {
+      stateDistChart.destroy();
+      stateDistChart = null;
+    } else if (typeof Chart !== 'undefined' && Chart.getChart) {
+      const existing = Chart.getChart(ctx);
+      if (existing) existing.destroy();
+    }
     stateDistChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -701,6 +722,13 @@ function initBottleneckCharts() {
   // Workload bar chart on bottleneck page
   const ctx2 = document.getElementById('chart-workload');
   if (ctx2) {
+    if (workloadChart) {
+      workloadChart.destroy();
+      workloadChart = null;
+    } else if (typeof Chart !== 'undefined' && Chart.getChart) {
+      const existing = Chart.getChart(ctx2);
+      if (existing) existing.destroy();
+    }
     workloadChart = new Chart(ctx2, {
       type: 'bar',
       data: {
@@ -720,6 +748,13 @@ function initBottleneckCharts() {
 function initOEEChart() {
   const ctx = document.getElementById('chart-oee-bar');
   if (ctx) {
+    if (oeeChart) {
+      oeeChart.destroy();
+      oeeChart = null;
+    } else if (typeof Chart !== 'undefined' && Chart.getChart) {
+      const existing = Chart.getChart(ctx);
+      if (existing) existing.destroy();
+    }
     oeeChart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -745,6 +780,13 @@ function initOEEChart() {
 function initWhatIfChart() {
   const ctx = document.getElementById('chart-whatif-comparison');
   if (ctx) {
+    if (whatifChart) {
+      whatifChart.destroy();
+      whatifChart = null;
+    } else if (typeof Chart !== 'undefined' && Chart.getChart) {
+      const existing = Chart.getChart(ctx);
+      if (existing) existing.destroy();
+    }
     whatifChart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -1202,7 +1244,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Show dashboard first
   showPage('dashboard');
-  initDashboardCharts();
 
   // Start real-time updates (try WS first, fall back to polling)
   try {
