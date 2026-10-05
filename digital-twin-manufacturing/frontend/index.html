@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Twin Manufacturing System — Bottleneck Analysis & Parallel Machine Allocation</title>
+  <meta name="description" content="Web-Based Digital Twin for Real-Time Manufacturing Bottleneck Analysis and Parallel Machine Allocation based on the research paper.">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <!-- Remix Icon CDN (Premium Vector Icons) -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet" />
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- ─── App Shell ─────────────────────────────────────────────────── -->
+<div class="app-shell">
+
+  <!-- ─── Top Header ────────────────────────────────────────────── -->
+  <header class="top-header">
+    <div class="header-brand">
+      <div class="logo-icon"><i class="ri-instance-fill"></i></div>
+      <div>
+        <h1>Digital Twin Manufacturing System</h1>
+        <p>Bottleneck Analysis · Parallel Machine Allocation · Industry 4.0</p>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Simulation Status -->
+      <div class="sim-status-pill" id="sim-status-pill">
+        <div class="status-dot stopped" id="status-dot"></div>
+        <span id="status-label">STOPPED</span>
+      </div>
+
+      <!-- Sim Timer -->
+      <div class="sim-time" title="Simulation elapsed time">
+        <i class="ri-time-line" style="vertical-align:middle;margin-right:2px;"></i> <span id="header-sim-time">00:00:00</span>
+      </div>
+
+      <!-- Parallel drilling badge -->
+      <span id="parallel-drill-badge" class="badge badge-green" style="display:none;">
+        <i class="ri-git-branch-line" style="vertical-align:middle;margin-right:2px;"></i> Parallel Drilling
+      </span>
+
+      <!-- Quick Controls in Header -->
+      <div style="display:flex;gap:8px;">
+        <button id="btn-start"  class="btn btn-success"    onclick="simControl('start')"  title="Start simulation"><i class="ri-play-fill"></i> Start</button>
+        <button id="btn-pause"  class="btn btn-warning"    onclick="simControl('pause')"  title="Pause" disabled><i class="ri-pause-fill"></i></button>
+        <button id="btn-resume" class="btn btn-secondary"  onclick="simControl('resume')" title="Resume" disabled><i class="ri-play-line"></i></button>
+        <button id="btn-stop"   class="btn btn-danger"     onclick="simControl('stop')"   title="Stop" disabled><i class="ri-stop-fill"></i></button>
+        <button id="btn-reset"  class="btn btn-secondary"  onclick="simControl('reset')"  title="Reset"><i class="ri-restart-line"></i></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── Sidebar ───────────────────────────────────────────────── -->
+  <nav class="sidebar">
+    <div class="nav-section-label">Main</div>
+
+    <button class="nav-item active" data-page="dashboard">
+      <span class="nav-icon"><i class="ri-dashboard-3-line"></i></span> Dashboard
+    </button>
+
+    <button class="nav-item" data-page="digital-twin">
+      <span class="nav-icon"><i class="ri-instance-line"></i></span> Digital Twin View
+    </button>
+
+    <button class="nav-item" data-page="machines">
+      <span class="nav-icon"><i class="ri-cpu-line"></i></span> Machines
+    </button>
+
+    <button class="nav-item" data-page="production">
+      <span class="nav-icon"><i class="ri-box-3-line"></i></span> Production
+    </button>
+
+    <div class="nav-section-label">Analysis</div>
+
+    <button class="nav-item" data-page="bottleneck">
+      <span class="nav-icon"><i class="ri-alert-line"></i></span> Bottleneck Analysis
+    </button>
+
+    <button class="nav-item" data-page="oee">
+      <span class="nav-icon"><i class="ri-bar-chart-grouped-line"></i></span> OEE &amp; Performance
+    </button>
+
+    <button class="nav-item" data-page="whatif">
+      <span class="nav-icon"><i class="ri-git-merge-line"></i></span> What-If Analysis
+    </button>
+
+    <div class="nav-section-label">Settings &amp; History</div>
+
+    <button class="nav-item" data-page="settings">
+      <span class="nav-icon"><i class="ri-settings-4-line"></i></span> Simulation Settings
+    </button>
+
+    <button class="nav-item" data-page="history">
+      <span class="nav-icon"><i class="ri-history-line"></i></span> Historical Runs
+    </button>
+
+    <!-- Speed Controls in Sidebar -->
+    <div style="margin-top:auto;padding-top:20px;">
+      <div class="nav-section-label">Simulation Speed</div>
+      <div class="speed-controls">
+        <button class="speed-btn" data-speed="1"  onclick="updateSpeedConfig(1)">1×</button>
+        <button class="speed-btn" data-speed="2"  onclick="updateSpeedConfig(2)">2×</button>
+        <button class="speed-btn active" data-speed="5" onclick="updateSpeedConfig(5)">5×</button>
+        <button class="speed-btn" data-speed="10" onclick="updateSpeedConfig(10)">10×</button>
+        <button class="speed-btn" data-speed="20" onclick="updateSpeedConfig(20)">20×</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── Main Content ──────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 1: DASHBOARD
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-dashboard" class="page-section active">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Manufacturing Dashboard</h2>
+          <p class="page-subtitle">Real-time simulation data · Auto-refreshes every 2 seconds</p>
+        </div>
+        <span style="font-size:12px;color:var(--text-muted);" id="last-update-time">Waiting for data...</span>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="stats-grid">
+        <div class="stat-card" style="--accent-color:var(--spice-rust)">
+          <div class="stat-icon"><i class="ri-box-3-line"></i></div>
+          <div class="stat-label">Total Production</div>
+          <div class="stat-value" id="stat-total-production">0</div>
+          <div class="stat-sub">units completed</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-wine)">
+          <div class="stat-icon"><i class="ri-flashlight-line"></i></div>
+          <div class="stat-label">Throughput</div>
+          <div class="stat-value mono" id="stat-throughput">0 /hr</div>
+          <div class="stat-sub">sim-hours rate</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-wine)">
+          <div class="stat-icon"><i class="ri-bar-chart-box-line"></i></div>
+          <div class="stat-label">Overall OEE</div>
+          <div class="stat-value" id="stat-oee">0%</div>
+          <div class="stat-sub">system average</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-wine)">
+          <div class="stat-icon"><i class="ri-alert-line"></i></div>
+          <div class="stat-label">Bottleneck</div>
+          <div class="stat-value" style="font-size:18px;" id="stat-bottleneck">—</div>
+          <div class="stat-sub">highest utilization</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-gold)">
+          <div class="stat-icon"><i class="ri-loader-4-line"></i></div>
+          <div class="stat-label">In Progress</div>
+          <div class="stat-value" id="stat-in-progress">0</div>
+          <div class="stat-sub">active products</div>
+        </div>
+        <div class="stat-card" style="--accent-color:#A82E37">
+          <div class="stat-icon"><i class="ri-close-circle-line"></i></div>
+          <div class="stat-label">Rejected</div>
+          <div class="stat-value text-red" id="stat-rejected">0</div>
+          <div class="stat-sub">quality failures</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-rust)">
+          <div class="stat-icon"><i class="ri-speed-up-line"></i></div>
+          <div class="stat-label">Avg Utilization</div>
+          <div class="stat-value" id="stat-avg-util">0%</div>
+          <div class="stat-sub">all machines</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-wine)">
+          <div class="stat-icon"><i class="ri-error-warning-line"></i></div>
+          <div class="stat-label">Breakdowns</div>
+          <div class="stat-value text-red" id="stat-breakdowns">0</div>
+          <div class="stat-sub">total events</div>
+        </div>
+      </div>
+
+      <!-- Bottleneck Alert -->
+      <div id="bottleneck-summary-card"></div>
+
+      <!-- Charts Row -->
+      <div class="grid-2">
+        <div class="chart-card">
+          <div class="chart-title"><i class="ri-bar-chart-2-line"></i> Machine Utilization</div>
+          <canvas id="chart-utilization" height="180"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="ri-line-chart-line"></i> Production Throughput (Over Time)</div>
+          <canvas id="chart-throughput" height="180"></canvas>
+        </div>
+      </div>
+
+      <!-- Production Flow -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-node-tree"></i> Live Production Flow</div>
+        <div class="flow-container" id="production-flow">
+          <!-- Rendered by JS -->
+          <div style="width:100%;text-align:center;color:var(--text-muted);padding:30px;">
+            Start the simulation to see the live production flow
+          </div>
+        </div>
+      </div>
+
+      <!-- Event Log + Workload side by side -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="ri-terminal-window-line"></i> Live Event Log</div>
+          <div class="event-log" id="event-log">
+            <div class="event-item info">
+              <span class="event-time">--:--:--</span>
+              <span class="event-msg">Waiting for simulation to start...</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ri-scales-3-line"></i> Workload Distribution</div>
+          <div id="workload-bars">
+            <div style="text-align:center;color:var(--text-muted);padding:30px;">
+              Start simulation to see workload data
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 2: DIGITAL TWIN VIEW
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-digital-twin" class="page-section">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Digital Twin — Factory Floor View</h2>
+          <p class="page-subtitle">Virtual representation of the manufacturing system</p>
+        </div>
+      </div>
+
+      <!-- Full-width flow visualization -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-node-tree"></i> Manufacturing Flow: Raw Material → Finished Product</div>
+        <div class="flow-container" id="digital-twin-flow" style="justify-content:center;">
+          <div style="width:100%;text-align:center;color:var(--text-muted);padding:30px;">
+            Start the simulation to see the digital twin
+          </div>
+        </div>
+      </div>
+
+      <!-- Sensor information note -->
+      <div style="background:linear-gradient(135deg,rgba(255,105,180,0.08),rgba(6,148,148,0.05));border:1px solid rgba(255,105,180,0.25);border-radius:var(--radius);padding:20px;margin-bottom:24px;">
+        <h3 style="font-size:14px;font-weight:800;color:var(--pop-teal);margin-bottom:12px;">
+          <i class="ri-plug-line"></i> Sensor Integration Architecture (Future Extension)
+        </h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+          <em>Current version uses simulation-generated real-time data. Physical sensor integration can be added as a future extension.</em>
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;font-size:12px;">
+          <div style="background:var(--bg-panel);border-radius:6px;padding:10px;">
+            <div style="font-weight:600;color:var(--text-primary)"><i class="ri-flashlight-line"></i> Current Sensor</div>
+            <div style="color:var(--text-muted)">Every machine spindle/motor → BUSY/IDLE detection</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:6px;padding:10px;">
+            <div style="font-weight:600;color:var(--text-primary)"><i class="ri-camera-lens-line"></i> Photoelectric Sensor</div>
+            <div style="color:var(--text-muted)">I/O of each machine → part counts</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:6px;padding:10px;">
+            <div style="font-weight:600;color:var(--text-primary)"><i class="ri-radar-line"></i> Proximity/Ultrasonic</div>
+            <div style="color:var(--text-muted)">Buffers → BLOCKED state detection</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:6px;padding:10px;">
+            <div style="font-weight:600;color:var(--text-primary)"><i class="ri-pulse-line"></i> Accelerometer</div>
+            <div style="color:var(--text-muted)">Drilling/Turning → early breakdown detection</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:6px;padding:10px;">
+            <div style="font-weight:600;color:var(--text-primary)"><i class="ri-temp-hot-line"></i> Temperature Sensor</div>
+            <div style="color:var(--text-muted)">Motor/bearing → overheating alerts</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:6px;padding:10px;">
+            <div style="font-weight:600;color:var(--text-primary)"><i class="ri-eye-line"></i> Vision Camera / Laser</div>
+            <div style="color:var(--text-muted)">Inspection → good vs rejected parts</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:6px;padding:10px;">
+            <div style="font-weight:600;color:var(--text-primary)"><i class="ri-traffic-light-line"></i> Stack Light / E-Stop</div>
+            <div style="color:var(--text-muted)">Control panel → confirmed BREAKDOWN state</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Machine cards for DT view -->
+      <div class="grid-auto" id="digital-twin-machine-cards">
+        <div style="text-align:center;color:var(--text-muted);padding:30px;grid-column:1/-1;">
+          Start simulation to see machine states
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 3: MACHINES
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-machines" class="page-section">
+      <div class="page-header">
+        <h2 class="page-title">Machine Status</h2>
+        <p class="page-subtitle">Detailed view of each manufacturing station</p>
+      </div>
+
+      <div class="grid-auto" id="machines-machine-cards">
+        <div style="text-align:center;color:var(--text-muted);padding:30px;grid-column:1/-1;">
+          Start simulation to see machine states
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 4: PRODUCTION / PRODUCTS
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-production" class="page-section">
+      <div class="page-header">
+        <h2 class="page-title">Production Tracking</h2>
+        <p class="page-subtitle">Active products moving through the manufacturing line</p>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card" style="--accent-color:#00F0FF">
+          <div class="stat-label">Completed</div>
+          <div class="stat-value" id="stat-completed">0</div>
+        </div>
+        <div class="stat-card" style="--accent-color:#FF69B4">
+          <div class="stat-label">In Progress</div>
+          <div class="stat-value" id="stat-in-progress-2">0</div>
+        </div>
+        <div class="stat-card" style="--accent-color:#069494">
+          <div class="stat-label">Rejected</div>
+          <div class="stat-value" id="stat-rejected-2">0</div>
+        </div>
+        <div class="stat-card" style="--accent-color:#FFFFFF">
+          <div class="stat-label">Sim Time</div>
+          <div class="stat-value mono" style="font-size:18px;" id="stat-sim-time">00:00:00</div>
+        </div>
+      </div>
+
+      <!-- Products Table -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-box-3-line"></i> Active Products in Production Line</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Product ID</th>
+                <th>Current Stage</th>
+                <th>Status</th>
+                <th>Processing Time</th>
+                <th>Assigned Machine</th>
+                <th>Quality</th>
+              </tr>
+            </thead>
+            <tbody id="products-tbody">
+              <tr>
+                <td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px;">
+                  Start the simulation to see products
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Event Log on Production Page -->
+      <div class="card">
+        <div class="card-title"><i class="ri-file-list-3-line"></i> Production Event Log</div>
+        <div class="event-log" id="event-log-2">
+          <div class="event-item info">
+            <span class="event-time">--:--:--</span>
+            <span class="event-msg">Waiting for simulation to start...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 5: BOTTLENECK ANALYSIS
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-bottleneck" class="page-section">
+      <div class="page-header">
+        <h2 class="page-title">Bottleneck Analysis</h2>
+        <p class="page-subtitle">Identify production constraints using utilization metrics</p>
+      </div>
+
+      <!-- Bottleneck current state -->
+      <div id="bottleneck-summary-card-2"></div>
+
+      <!-- Method explanation -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-book-open-line"></i> Detection Method (Research Paper Approach)</div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+          Consistent with the research paper, the bottleneck is identified as the machine with
+          the highest <strong>Busy-State Utilization Percentage</strong>:
+        </p>
+        <div style="background:var(--bg-panel);border-radius:8px;padding:16px;font-family:var(--font-mono);font-size:13px;color:var(--accent-cyan);">
+          Utilization (%) = (Busy Time / Total Available Time) × 100
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+          The paper identifies Drilling as the primary bottleneck with ~85.5% busy-state percentage.
+          Our simulation calculates this dynamically — if any other machine becomes the highest-utilization
+          station, it will be shown as the bottleneck instead.
+        </p>
+      </div>
+
+      <!-- Bottleneck machine comparison -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-bar-chart-2-line"></i> Machine Utilization Comparison</div>
+        <div id="bottleneck-detail">
+          <div style="text-align:center;color:var(--text-muted);padding:30px;">
+            Start simulation to see bottleneck analysis
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid-2">
+        <div class="chart-card">
+          <div class="chart-title"><i class="ri-pie-chart-2-line"></i> System-Wide State Distribution</div>
+          <canvas id="chart-state-dist" height="200"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="ri-inbox-archive-line"></i> Units Processed per Machine</div>
+          <canvas id="chart-workload" height="200"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 6: OEE & PERFORMANCE
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-oee" class="page-section">
+      <div class="page-header">
+        <h2 class="page-title">OEE &amp; Performance</h2>
+        <p class="page-subtitle">Overall Equipment Effectiveness = Availability × Performance × Quality</p>
+      </div>
+
+      <!-- System OEE Big Number -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card" style="--accent-color:var(--spice-wine)">
+          <div class="stat-label">System OEE</div>
+          <div class="stat-value" id="system-oee-value">0%</div>
+          <div class="stat-sub">A × P × Q average</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-gold)">
+          <div class="stat-label">Paper Baseline OEE</div>
+          <div class="stat-value" style="color:var(--spice-gold-text)">43.6%</div>
+          <div class="stat-sub">reference value</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-rust)">
+          <div class="stat-label">Paper Modified OEE</div>
+          <div class="stat-value" style="color:var(--spice-rust)">55.49%</div>
+          <div class="stat-sub">reference value</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--spice-wine)">
+          <div class="stat-label">Paper OEE Improvement</div>
+          <div class="stat-value" style="color:var(--spice-wine)">+27.3%</div>
+          <div class="stat-sub">reference value</div>
+        </div>
+      </div>
+
+      <!-- OEE Formula Explanation -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-function-line"></i> OEE Formula</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+          <div style="background:var(--bg-panel);border-radius:8px;padding:14px;border-left:3px solid var(--spice-wine);">
+            <div style="font-weight:700;color:var(--spice-wine);margin-bottom:4px;">Availability</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);">(Planned - Breakdown) / Planned</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Simulates what a stack light / current sensor reports</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:8px;padding:14px;border-left:3px solid var(--spice-rust);">
+            <div style="font-weight:700;color:var(--spice-rust);margin-bottom:4px;">Performance</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);">(Ideal Cycle × Units) / Run Time</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Compares to ideal cycle from photoelectric sensor counts</div>
+          </div>
+          <div style="background:var(--bg-panel);border-radius:8px;padding:14px;border-left:3px solid var(--spice-gold);">
+            <div style="font-weight:700;color:var(--spice-gold-text);margin-bottom:4px;">Quality</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);">Good Units / Total Units</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Vision camera / laser gauge at inspection station</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OEE per machine rings -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-donut-chart-line"></i> OEE per Machine</div>
+        <div class="oee-grid" id="oee-machines-grid">
+          <div style="text-align:center;color:var(--text-muted);padding:30px;grid-column:1/-1;">
+            Start simulation to see OEE data
+          </div>
+        </div>
+      </div>
+
+      <!-- OEE Bar Chart -->
+      <div class="chart-card">
+        <div class="chart-title"><i class="ri-bar-chart-grouped-line"></i> OEE Components per Machine</div>
+        <canvas id="chart-oee-bar" height="160"></canvas>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 7: WHAT-IF ANALYSIS
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-whatif" class="page-section">
+      <div class="page-header">
+        <h2 class="page-title">What-If Analysis</h2>
+        <p class="page-subtitle">Test the effect of adding a parallel drilling machine</p>
+      </div>
+
+      <!-- Paper Reference Values -->
+      <div class="paper-ref-box">
+        <h3><i class="ri-file-paper-2-line"></i> Research Paper Reference Values</h3>
+        <p>These are the values reported in the paper. They are shown here for validation only and are NOT mixed with live simulation data.</p>
+        <div class="paper-ref-grid">
+          <div class="paper-ref-item">
+            <div class="ref-val">478</div>
+            <div class="ref-label">Baseline Throughput (units)</div>
+          </div>
+          <div class="paper-ref-item">
+            <div class="ref-val">760</div>
+            <div class="ref-label">Modified Throughput (units)</div>
+          </div>
+          <div class="paper-ref-item">
+            <div class="ref-val">~59%</div>
+            <div class="ref-label">Throughput Improvement</div>
+          </div>
+          <div class="paper-ref-item">
+            <div class="ref-val">85.5%</div>
+            <div class="ref-label">Drilling Busy-State %</div>
+          </div>
+          <div class="paper-ref-item">
+            <div class="ref-val">43.6%</div>
+            <div class="ref-label">Baseline OEE</div>
+          </div>
+          <div class="paper-ref-item">
+            <div class="ref-val">55.49%</div>
+            <div class="ref-label">Modified OEE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- What-If Controls -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-tools-line"></i> What-If Controls</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <button id="btn-add-parallel" class="btn btn-purple" onclick="addParallelDrillingMachine()">
+            <i class="ri-add-circle-line"></i> ADD PARALLEL DRILLING MACHINE
+          </button>
+          <button id="btn-remove-parallel" class="btn btn-secondary" onclick="removeParallelDrillingMachine()">
+            <i class="ri-delete-bin-line"></i> Remove Parallel Machine
+          </button>
+          <button class="btn btn-secondary" onclick="refreshWhatIfDisplay()">
+            <i class="ri-refresh-line"></i> Refresh Comparison
+          </button>
+          <button class="btn btn-success" onclick="saveWhatIfComparison()">
+            <i class="ri-save-line"></i> Save to DB
+          </button>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+          <strong>Steps:</strong> 1) Start simulation → 2) Run for at least 30 seconds → 3) Click "ADD PARALLEL DRILLING MACHINE" → 4) Wait and observe improvement → 5) Compare metrics below.
+        </p>
+      </div>
+
+      <!-- Comparison Table -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-table-line"></i> Baseline vs Modified Comparison (Live Simulation Data)</div>
+        <div id="whatif-comparison">
+          <div style="text-align:center;color:var(--text-muted);padding:40px;">
+            <div style="font-size:38px;margin-bottom:12px;color:var(--spice-wine)"><i class="ri-git-merge-line"></i></div>
+            <p>Start the simulation, then click <strong style="color:var(--spice-rust)">ADD PARALLEL DRILLING MACHINE</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- What-If Chart -->
+      <div class="chart-card">
+        <div class="chart-title"><i class="ri-line-chart-line"></i> Baseline vs Modified — Key Metrics</div>
+        <canvas id="chart-whatif-comparison" height="200"></canvas>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 8: SETTINGS
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-settings" class="page-section">
+      <div class="page-header">
+        <h2 class="page-title">Simulation Settings</h2>
+        <p class="page-subtitle">Configure machine parameters and simulation behaviour</p>
+      </div>
+
+      <!-- Global Settings -->
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-global-line"></i> Global Simulation Parameters</div>
+        <div class="settings-grid">
+          <div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-speed">Simulation Speed Multiplier</label>
+              <input type="number" id="cfg-speed" class="form-input" value="5" min="0.5" max="50" step="0.5">
+              <p class="form-hint">How many sim-seconds pass per real second (1× = real-time, 5× = 5× faster)</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-arrival">Product Arrival Rate (sim-seconds)</label>
+              <input type="number" id="cfg-arrival" class="form-input" value="8" min="1" max="60">
+              <p class="form-hint">Time between new products entering the line (simulation seconds)</p>
+            </div>
+          </div>
+          <div>
+            <div class="form-group">
+              <label class="form-label">Breakdown Events</label>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+                <input type="checkbox" id="cfg-breakdown" checked style="width:18px;height:18px;">
+                <label for="cfg-breakdown" style="font-size:13px;color:var(--text-secondary);">Enable random breakdown events</label>
+              </div>
+              <p class="form-hint">Simulates what accelerometer/temperature sensors detect</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="applySettings()"><i class="ri-check-line"></i> Apply Global Settings</button>
+      </div>
+
+      <!-- Per-Machine Settings -->
+      <div class="card">
+        <div class="card-title"><i class="ri-equalizer-line"></i> Per-Machine Configuration</div>
+        <div id="machine-config-panels"></div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PAGE 9: HISTORICAL RUNS
+         ══════════════════════════════════════════════════════════ -->
+    <section id="page-history" class="page-section">
+      <div class="page-header">
+        <h2 class="page-title">Historical Simulation Runs</h2>
+        <p class="page-subtitle">Review past simulation sessions stored in the database</p>
+      </div>
+
+      <div class="card mb-24">
+        <div class="card-title"><i class="ri-history-line"></i> Simulation Run History</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Run Name</th>
+                <th>Status</th>
+                <th>Products</th>
+                <th>Parallel Drill</th>
+                <th>Speed</th>
+                <th>Started</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody">
+              <tr>
+                <td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px;">
+                  Loading history...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- What-If History -->
+      <div class="card">
+        <div class="card-title"><i class="ri-archive-line"></i> Saved What-If Analysis Results</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Time</th>
+                <th>Baseline TP</th>
+                <th>Modified TP</th>
+                <th>TP Improvement</th>
+                <th>Baseline OEE</th>
+                <th>Modified OEE</th>
+              </tr>
+            </thead>
+            <tbody id="whatif-history-tbody">
+              <tr>
+                <td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">
+                  No saved what-if results yet
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <button class="btn btn-secondary" style="margin-top:12px;" onclick="loadWhatIfHistory()"><i class="ri-refresh-line"></i> Refresh</button>
+      </div>
+    </section>
+
+  </main><!-- end main-content -->
+</div><!-- end app-shell -->
+
+<!-- ─── Toast Container ────────────────────────────────────────── -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ─── JavaScript ─────────────────────────────────────────────── -->
+<script src="/js/app.js"></script>
+</body>
+</html>
